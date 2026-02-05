@@ -4,11 +4,15 @@ FROM jenkins/jenkins:lts
 USER root
 
 # Optional: install Docker CLI (if you want Jenkins to build Docker containers)
-RUN apt-get update && apt-get install -y \
+RUN apt update && apt-get install -y \
     docker.io \
     wget \
     curl \
+    python3 \
+    python3-venv \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Set environment variables (optional)
 # ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
