@@ -1,0 +1,19 @@
+FROM jenkins/jenkins:lts
+
+# Switch to root to install dependencies or adjust permissions
+USER root
+
+# Optional: install Docker CLI (if you want Jenkins to build Docker containers)
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables (optional)
+# ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
+
+# Expose Jenkins ports
+EXPOSE 8080 50000
+
+# Set default user back to jenkins
+USER jenkins
+

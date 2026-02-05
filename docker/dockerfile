@@ -30,8 +30,8 @@ RUN GECKODRIVER_VERSION=0.34.0 && \
     rm geckodriver-v${GECKODRIVER_VERSION}-linux64.tar.gz
 
 # Install Python dependencies
-COPY  requirments.txt .
-RUN pip install -r requirments.txt
+COPY  requirements.txt .
+RUN pip install -r requirements.txt
 
 # Copy app code
 COPY . .
