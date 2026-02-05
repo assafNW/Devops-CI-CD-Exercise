@@ -6,6 +6,8 @@ USER root
 # Optional: install Docker CLI (if you want Jenkins to build Docker containers)
 RUN apt-get update && apt-get install -y \
     docker.io \
+    wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables (optional)
