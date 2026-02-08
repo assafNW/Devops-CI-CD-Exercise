@@ -13,6 +13,32 @@ RUN apt update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    firefox-esr \
+    wget \
+    ca-certificates \
+    libgtk-3-0 \
+    libdbus-glib-1-2 \
+    libasound2 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libxshmfence1 \
+    libxtst6 \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GeckoDriver
+RUN GECKODRIVER_VERSION=0.34.0 && \
+    wget -q https://github.com/mozilla/geckodriver/releases/download/v${GECKODRIVER_VERSION}/geckodriver-v${GECKODRIVER_VERSION}-linux64.tar.gz && \
+    tar -xzf geckodriver-v${GECKODRIVER_VERSION}-linux64.tar.gz && \
+    mv geckodriver /usr/local/bin/ && \
+    chmod +x /usr/local/bin/geckodriver && \
+    rm geckodriver-v${GECKODRIVER_VERSION}-linux64.tar.gz
 
 # Set environment variables (optional)
 # ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
