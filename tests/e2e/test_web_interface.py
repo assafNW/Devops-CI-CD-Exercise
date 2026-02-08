@@ -35,8 +35,9 @@ def driver(app_server):
     firefox_options.add_argument("--disable-dev-shm-usage")
 
     try:
-        service = Service(GeckoDriverManager().install())
-        driver = webdriver.Firefox(service=service, options=firefox_options)
+        # service = Service(GeckoDriverManager().install())
+        # driver = webdriver.Firefox(service=service, options=firefox_options)
+        driver = webdriver.Firefox(options=firefox_options)
     except OSError as e:
         # Handle exec format error by trying to find system geckodriver
         if "Exec format error" in str(e):
