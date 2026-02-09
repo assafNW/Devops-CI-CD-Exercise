@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     firefox-esr \
     wget \
     ca-certificates \
+    openssl  \
     libgtk-3-0 \
     libdbus-glib-1-2 \
     libasound2 \
@@ -40,8 +41,21 @@ RUN GECKODRIVER_VERSION=0.34.0 && \
     chmod +x /usr/local/bin/geckodriver && \
     rm geckodriver-v${GECKODRIVER_VERSION}-linux64.tar.gz
 
+# Download Gmail SMTP certificate and import into Java truststore
+RUN mkdir -p /tmp/certs && \
+    openssl s_client -showcerts -connect smtp.gmail.com:465 </dev/null 2>/dev/null | \
+    openssl x509 -outform PEM > /tmp/certs/smtp_gmail.pem && \
+    keytool -import -trustcacerts -noprompt \
+    -alias gmail-smtp \
+    -file /tmp/certs/smtp_gmail.pem \
+    -keystore $JAVA_HOME/lib/security/cacerts \
+    -storepass changeit && \
+    rm -rf /tmp/certs
+
 # Set environment variables (optional)
 # ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
+ENV JENKINS_JAVA_OPTS="-Dmail.smtp.ssl.trust=smtp.gmail.com"
+ENV JAVA_OPTS="-Dmail.smtp.ssl.trust=smtp.gmail.com"
 
 # Expose Jenkins ports
 EXPOSE 8080 50000
