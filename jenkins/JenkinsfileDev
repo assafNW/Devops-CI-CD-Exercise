@@ -5,6 +5,7 @@ pipeline {
         PYTHON_VERSION = '3'
         VENV_DIR = 'venv'
         REPO_URL = 'https://github.com/assafNW/Devops-CI-CD-Exercise.git'
+        EMAIL_AUTHOR = "devops.group2@tuta.io"
     }
     
     stages {
@@ -136,12 +137,6 @@ pipeline {
         }
         
         stage('Build Docker Image') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'develop'
-                }
-            }
             steps {
                 script {
                     sh '''
@@ -153,9 +148,6 @@ pipeline {
         }
         
         stage('Deploy to Staging') {
-            when {
-                branch 'develop'
-            }
             steps {
                 script {
                     sh '''
@@ -191,7 +183,7 @@ pipeline {
                         </ul>
                         <p><a href="${env.BUILD_URL}">View Build Details</a></p>
                     """,
-                    to: "${env.CHANGE_AUTHOR_EMAIL}"
+                    to: "${env.EMAIL_AUTHOR}"
                 )
             }
         }
@@ -210,7 +202,7 @@ pipeline {
                         </ul>
                         <p><a href="${env.BUILD_URL}">View Build Details</a></p>
                     """,
-                    to: "${env.CHANGE_AUTHOR_EMAIL}"
+                    to: "${EMAIL_AUTHOR}"
                 )
             }
         }
