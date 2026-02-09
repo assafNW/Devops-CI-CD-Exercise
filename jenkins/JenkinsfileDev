@@ -136,16 +136,16 @@ pipeline {
             }
         }
         
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    sh '''
-                        docker build -t devops-testing-app:${BUILD_NUMBER} .
-                        docker tag devops-testing-app:${BUILD_NUMBER} devops-testing-app:latest
-                    '''
-                }
-            }
-        }
+        // stage('Build Docker Image') {
+        //     steps {
+        //         script {
+        //             sh '''
+        //                 docker build -t devops-testing-app:${BUILD_NUMBER} .
+        //                 docker tag devops-testing-app:${BUILD_NUMBER} devops-testing-app:latest
+        //             '''
+        //         }
+        //     }
+        // }
         
         stage('Deploy to Staging') {
             steps {
