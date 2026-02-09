@@ -209,7 +209,7 @@ pipeline {
 
             echo "Opening a bug ticket on JIRA..."
             jiraIssueUpsert(
-                site: 'assaf-devops.atlassian.net',
+                site: 'assaf-devops',
                 projectKey: 'CICDEX',
                 issueType: 'Bug',
                 summary: "Pipline failed! \n Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
