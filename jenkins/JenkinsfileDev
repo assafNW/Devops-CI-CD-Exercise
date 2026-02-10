@@ -220,7 +220,7 @@ pipeline {
                             Duration: ${currentBuild.durationString},
                             Failed Stage: ${currentBuild.currentResult},
 
-                            View Build Details Here: ${env.BUILD_URL}"""
+                            View Build Details Here: ${env.BUILD_URL}""",
                         issuetype: [
                             name: 'Bug'
                         ]
