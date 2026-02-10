@@ -6,6 +6,8 @@ pipeline {
         VENV_DIR = 'venv'
         REPO_URL = 'https://github.com/assafNW/Devops-CI-CD-Exercise.git'
         EMAIL_AUTHOR = "assaf.naaman.work@gmail.com"
+        JIRA_JENKINS_USER = "712020:10dea211-8b58-46e4-aaca-6e942f7d405e"
+        JIRA_ASIGNEE_USER = "712020:8075411c-abf1-445b-b14e-3d659e5c8923"
     }
     
     stages {
@@ -224,8 +226,14 @@ pipeline {
                         """,
                         issuetype: [
                             name: 'Bug'
+                        ],
+                        reporter: [
+                            id: "${env.JIRA_JENKINS_USER}"
+                        ],
+                        // This sets who the bug is assigned to
+                        assignee: [
+                            id: "${env.JIRA_ASIGNEE_USER}"
                         ]
-                    ]
                 ]
                 // Creates the issue and return the ID
                 def response = jiraNewIssue issue: bugIssue, site: 'assaf-devops'
