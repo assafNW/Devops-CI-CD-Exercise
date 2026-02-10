@@ -234,6 +234,7 @@ pipeline {
                         assignee: [
                             id: "${env.JIRA_ASIGNEE_USER}"
                         ]
+                    ]
                 ]
                 // Creates the issue and return the ID
                 def response = jiraNewIssue issue: bugIssue, site: 'assaf-devops'
