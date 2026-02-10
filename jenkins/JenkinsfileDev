@@ -188,9 +188,9 @@ pipeline {
             }
         }
         failure {
-            echo "Sending email upon failure..."
             script {
                 sh 'echo "Pipeline failed!"'
+                sh 'echo "Sending email upon failure..."'
                 emailext (
                     subject: "❌ Pipeline Failure: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
                     body: """
@@ -208,13 +208,34 @@ pipeline {
             }
 
             echo "Opening a bug ticket on JIRA..."
-            jiraIssueUpsert(
-                site: 'assaf-devops',
-                projectKey: 'CICDEX',
-                issueType: 'Bug',
-                summary: "Pipline failed! \n Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
-                description: "Build ${env.BUILD_NUMBER} of ${env.JOB_NAME} failed. See: ${env.BUILD_URL}console"
-            ) 
+            script{
+                def bugIssue = [
+                    fields: [
+                        project: [
+                            key: 'CICDEX'
+                        ],
+                        summary: "Development pipline failed! \nBuild: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                        description: "Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}, \n
+                            Branch: ${env.BRANCH_NAME}, \n
+                            Duration: ${currentBuild.durationString}, \n
+                            Failed Stage: ${currentBuild.currentResult}. \n\n
+                            View Build Details Here: ${env.BUILD_URL}"
+                        issueType: [
+                            name: 'Bug'
+                        ]
+                    ]
+                ]
+                // Creates the issue and return the ID
+                def response = jiraNewIssue issue: bugIssue, site: 'assaf-devops.atlassian.net'
+                echo "Bug ticket created on JIRA: ${response.data.key}"
+            }
+            // jiraIssueUpsert(
+            //     site: 'assaf-devops.atlassian.net',
+            //     projectKey: 'CICDEX',
+            //     issueType: 'Bug',
+            //     summary: "Pipline failed! \n Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+            //     description: "Build ${env.BUILD_NUMBER} of ${env.JOB_NAME} failed. See: ${env.BUILD_URL}console"
+            // ) 
         }
     }
 }
