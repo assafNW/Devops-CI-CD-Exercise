@@ -215,12 +215,11 @@ pipeline {
                             key: 'CICDEX'
                         ],
                         summary: "Development pipline failed! \nBuild: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
-                        description: """Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER},
-                            Branch: ${env.BRANCH_NAME},
-                            Duration: ${currentBuild.durationString},
-                            Failed Stage: ${currentBuild.currentResult},
-
-                            View Build Details Here: ${env.BUILD_URL}""",
+                        description: "Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}, 
+                                    Branch: ${env.BRANCH_NAME}, 
+                                    Duration: ${currentBuild.durationString}, 
+                                    Failed Stage: ${currentBuild.currentResult}, 
+                                    View Build Details Here: ${env.BUILD_URL}",
                         issuetype: [
                             name: 'Bug'
                         ]
