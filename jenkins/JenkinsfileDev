@@ -215,18 +215,19 @@ pipeline {
                             key: 'CICDEX'
                         ],
                         summary: "Development pipline failed! \nBuild: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
-                        description: "Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}, \n
-                            Branch: ${env.BRANCH_NAME}, \n
-                            Duration: ${currentBuild.durationString}, \n
-                            Failed Stage: ${currentBuild.currentResult}. \n\n
-                            View Build Details Here: ${env.BUILD_URL}"
-                        issueType: [
+                        description: """Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER},
+                            Branch: ${env.BRANCH_NAME},
+                            Duration: ${currentBuild.durationString},
+                            Failed Stage: ${currentBuild.currentResult},
+
+                            View Build Details Here: ${env.BUILD_URL}"""
+                        issuetype: [
                             name: 'Bug'
                         ]
                     ]
                 ]
                 // Creates the issue and return the ID
-                def response = jiraNewIssue issue: bugIssue, site: 'assaf-devops.atlassian.net'
+                def response = jiraNewIssue issue: bugIssue, site: 'assaf-devops'
                 echo "Bug ticket created on JIRA: ${response.data.key}"
             }
             // jiraIssueUpsert(
