@@ -176,7 +176,7 @@ pipeline {
                             else {
                                 patch += 1
                             }
-                            def newVersion = "v${major}.${minor}.${patch}"
+                            newVersion = "v${major}.${minor}.${patch}"
                         }
                         
                         echo "New version: ${newVersion}"
