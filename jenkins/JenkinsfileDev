@@ -141,15 +141,82 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh '''
-                        docker build -t devops-testing-app:${BUILD_NUMBER} .
-                        docker tag devops-testing-app:${BUILD_NUMBER} devops-testing-app:latest
-                    '''
+                    withCredentials([
+                        usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS'),
+                        usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')
+                    ]) {
+                        sh """
+                            git config --global user.name "jenkins-local"
+                            git config --global user.email "jenkins-local@gmail.com"
+                            git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/MatanItzhaki12/Devops-ci-cd-exercise.git
+                            git fetch --tags
+                        """
+                        def latestTag = sh(
+                            script: "git tag --sort=-v:refname | grep -Eo 'v[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1 || echo 'v0.0.0'",
+                            returnStdout: true
+                        ).trim()
+
+                        echo "Current version: ${latestTag}"
+                        if (latestTag == '') {
+                            latestTag = 'v1.0.0'
+                        }
+                        def parts = latestTag.replace('v','').tokenize('.')
+                        def major = parts[0].toInteger()
+                        def minor = parts[1].toInteger()
+                        def patch = parts[2].toInteger()
+                        if (latestTag == 'v1.0.0'){
+                            def newVersion = latestTag
+                        }
+                        else {
+                            def parts = latestTag.replace('v','').tokenize('.')
+                            def major = parts[0].toInteger()
+                            def minor = parts[1].toInteger()
+                            def patch = parts[2].toInteger()
+                            if (patch == 9){
+                                patch = 0
+                                minor = 1
+                            }
+                            else {
+                                patch += 1
+                            }
+                            def newVersion = "v${major}.${minor}.${patch}"
+                        }
+                        
+                        echo "New version: ${newVersion}"
+
+                        echo "---------------------------------------"
+                        echo "   New Release Version: ${newVersion}"
+                        echo "---------------------------------------"
+
+                        sh """
+                            echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                            echo "Building ${newVersion}..."
+
+                            docker build -f docker/dockerfile -t assafnw/devops-ci-cd-dev:${newVersion} .
+                            docker tag assafnw/devops-ci-cd-dev:${newVersion} assafnw/devops-ci-cd-dev:latest
+                            
+                            echo "Pushing Docker images..."
+                            docker push assafnw/devops-ci-cd-dev:${newVersion}
+                            docker push assafnw/devops-ci-cd-dev:latest
+                            
+                            docker logout
+                        """
+
+                        echo "Pushing new tag to GitHub..."
+                        
+                        sh """
+                            git tag -a ${newVersion} -m "jenkins-local: Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"
+                            git push origin ${newVersion}
+                        """
+                    }
                 }
             }
         }
         
         stage('Deploy to Staging') {
+            when {
+                branch 'develop'
+            }
             steps {
                 script {
                     sh '''
