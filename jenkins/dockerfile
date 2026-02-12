@@ -41,21 +41,13 @@ RUN GECKODRIVER_VERSION=0.34.0 && \
     chmod +x /usr/local/bin/geckodriver && \
     rm geckodriver-v${GECKODRIVER_VERSION}-linux64.tar.gz
 
-# Download Gmail SMTP certificate and import into Java truststore
-RUN mkdir -p /tmp/certs && \
-    openssl s_client -showcerts -connect smtp.gmail.com:465 </dev/null 2>/dev/null | \
-    openssl x509 -outform PEM > /tmp/certs/smtp_gmail.pem && \
-    keytool -import -trustcacerts -noprompt \
-    -alias gmail-smtp \
-    -file /tmp/certs/smtp_gmail.pem \
-    -keystore $JAVA_HOME/lib/security/cacerts \
-    -storepass changeit && \
-    rm -rf /tmp/certs
+# Install Java CA certificates properly (FIX for PKIX issue)
+RUN apt-get install -y ca-certificates-java && \
+    update-ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-# Set environment variables (optional)
-# ENV JAVA_OPTS="-Djenkins.install.runSetupWizard=false"
-ENV JENKINS_JAVA_OPTS="-Dmail.smtp.ssl.trust=smtp.gmail.com"
-ENV JAVA_OPTS="-Dmail.smtp.ssl.trust=smtp.gmail.com"
+# Force Java to sync OS CA certs into its truststore (CRITICAL FIX)
+RUN /var/lib/dpkg/info/ca-certificates-java.postinst configure
 
 # Expose Jenkins ports
 EXPOSE 8080 50000
