@@ -152,7 +152,7 @@ pipeline {
                             git fetch --tags
                         """
                         def latestTag = sh(
-                            script: "git tag --sort=-v:refname | grep -Eo 'v[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1 || echo 'v0.0.0'",
+                            script: "git tag --sort=-v:refname | grep -Eo 'v[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1",
                             returnStdout: true
                         ).trim()
 
@@ -160,8 +160,9 @@ pipeline {
                         if (latestTag == '') {
                             latestTag = 'v1.0.0'
                         }
+                        def newVersion
                         if (latestTag == 'v1.0.0'){
-                            def newVersion = latestTag
+                            newVersion = latestTag
                         }
                         else {
                             def parts = latestTag.replace('v','').tokenize('.')
