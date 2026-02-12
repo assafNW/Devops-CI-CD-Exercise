@@ -160,10 +160,6 @@ pipeline {
                         if (latestTag == '') {
                             latestTag = 'v1.0.0'
                         }
-                        def parts = latestTag.replace('v','').tokenize('.')
-                        def major = parts[0].toInteger()
-                        def minor = parts[1].toInteger()
-                        def patch = parts[2].toInteger()
                         if (latestTag == 'v1.0.0'){
                             def newVersion = latestTag
                         }
