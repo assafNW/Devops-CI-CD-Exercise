@@ -40,3 +40,21 @@
 
 ### Architecture of project
 ![Architecture for project](./images/ci_cd_jenkins.png)
+
+### Successful Pipeline
+![Architecture for project](./images/Jenkins-Success_Pipeline.png)
+
+- #### Success Email
+    ![Architecture for project](./images/Success_Email_Sent.png)
+
+### Failed Pipeline
+![Architecture for project](./images/Jenkins-Failed_Pipeline-Detailed_Post.png)
+
+- #### Failed Email
+    ![Architecture for project](./images/Failed_Email_Sent.png)
+
+- #### Jira Ticket - Backlog
+    ![Architecture for project](./images/Pipeline_Failed-Jira_Ticket_Backlog.png)
+
+- #### Jira Ticket - View Ticket
+    ![Architecture for project](./images/Pipeline_Failed-Jira_Ticket_Detailed.png)
