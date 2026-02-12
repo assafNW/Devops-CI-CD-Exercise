@@ -58,7 +58,7 @@ pipeline {
                         keepAll: true,
                         reportDir: 'htmlcov',
                         reportFiles: 'index.html',
-                        reportName: 'Unit Test Coverage Report'
+                        reportName: 'Unit Tests Coverage Report'
                     ])
                     archiveArtifacts artifacts: 'htmlcov/**/*', allowEmptyArchive: false
                 }
@@ -68,12 +68,21 @@ pipeline {
         stage('Integration Tests') {
             steps {
                 script {
-                    sh '. ${VENV_DIR}/bin/activate && pytest tests/integration/ -v --junit-xml=reports/integration-tests.xml'
+                    sh '. ${VENV_DIR}/bin/activate && pytest tests/integration/ -v --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/integration-tests.xml'
                 }
             }
             post {
                 always {
                     junit 'reports/integration-tests.xml'
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'htmlcov',
+                        reportFiles: 'index.html',
+                        reportName: 'Integration Tests Coverage Report'
+                    ])
+                    archiveArtifacts artifacts: 'htmlcov/**/*', allowEmptyArchive: false
                 }
             }
         }
@@ -86,7 +95,7 @@ pipeline {
                         export DISPLAY=:99
                         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
                         sleep 3
-                        pytest tests/e2e/ -v --junit-xml=reports/e2e-tests.xml
+                        pytest tests/e2e/ -v --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/e2e-tests.xml
                         killall Xvfb || true
                     '''
                 }
@@ -94,6 +103,15 @@ pipeline {
             post {
                 always {
                     junit 'reports/e2e-tests.xml'
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'htmlcov',
+                        reportFiles: 'index.html',
+                        reportName: 'E2E Tests Coverage Report'
+                    ])
+                    archiveArtifacts artifacts: 'htmlcov/**/*', allowEmptyArchive: false
                 }
             }
         }
