@@ -157,12 +157,9 @@ pipeline {
                         ).trim()
 
                         echo "Current version: ${latestTag}"
-                        if (latestTag == '') {
-                            latestTag = 'v1.0.0'
-                        }
                         def newVersion
-                        if (latestTag == 'v1.0.0'){
-                            newVersion = latestTag
+                        if (latestTag == '') {
+                            newVersion = 'v1.0.0'
                         }
                         else {
                             def parts = latestTag.replace('v','').tokenize('.')
@@ -304,13 +301,6 @@ pipeline {
                 def response = jiraNewIssue issue: bugIssue, site: 'assaf-devops'
                 echo "Bug ticket created on JIRA: ${response.data.key}"
             }
-            // jiraIssueUpsert(
-            //     site: 'assaf-devops.atlassian.net',
-            //     projectKey: 'CICDEX',
-            //     issueType: 'Bug',
-            //     summary: "Pipline failed! \n Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
-            //     description: "Build ${env.BUILD_NUMBER} of ${env.JOB_NAME} failed. See: ${env.BUILD_URL}console"
-            // ) 
         }
     }
 }
