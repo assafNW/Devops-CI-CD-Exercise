@@ -251,11 +251,15 @@ pipeline {
     
     post {
         always {
-            allure results: [
-                [path: 'allure-results/unit'],
-                [path: 'allure-results/integration'],
-                [path: 'allure-results/e2e']
-            ]
+            allure ([ 
+                results: [
+                    [path: 'allure-results/unit'],
+                    [path: 'allure-results/integration'],
+                    [path: 'allure-results/e2e']
+                ], 
+                includeProperties: true,
+                reportBuildPolicy: 'ALWAYS'
+            ])
             cleanWs()
         }
         success {
