@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y \
     libxshmfence1 \
     libxtst6 \
     fonts-liberation \
+    allure \
     && update-ca-certificates \
     && /var/lib/dpkg/info/ca-certificates-java.postinst configure \
     && rm -rf /var/lib/apt/lists/*

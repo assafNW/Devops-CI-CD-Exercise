@@ -10,6 +10,10 @@ pipeline {
         JIRA_ASIGNEE_USER = "712020:8075411c-abf1-445b-b14e-3d659e5c8923"
     }
     
+    tools {
+        allure 'Allure'
+    }
+
     stages {
         stage('Checkout Source Code') {
             steps {
@@ -49,7 +53,7 @@ pipeline {
             steps {
                 script {
                     sh 'mkdir -p reports'
-                    sh '. ${VENV_DIR}/bin/activate && pytest tests/unit/ -v --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/unit-tests.xml'
+                    sh '. ${VENV_DIR}/bin/activate && pytest tests/unit/ -v --alluredir=allure-results/unit --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/unit-tests.xml'
                 }
             }
             post {
@@ -71,7 +75,7 @@ pipeline {
         stage('Integration Tests') {
             steps {
                 script {
-                    sh '. ${VENV_DIR}/bin/activate && pytest tests/integration/ -v --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/integration-tests.xml'
+                    sh '. ${VENV_DIR}/bin/activate && pytest tests/integration/ -v --alluredir=allure-results/integration --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/integration-tests.xml'
                 }
             }
             post {
@@ -98,7 +102,7 @@ pipeline {
                         export DISPLAY=:99
                         Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
                         sleep 3
-                        pytest tests/e2e/ -v --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/e2e-tests.xml
+                        pytest tests/e2e/ -v --alluredir=allure-results/e2e --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/e2e-tests.xml
                         killall Xvfb || true
                     '''
                 }
@@ -247,6 +251,11 @@ pipeline {
     
     post {
         always {
+            allure results: [
+                [path: 'allure-results/unit'],
+                [path: 'allure-results/integration'],
+                [path: 'allure-results/e2e']
+            ]
             cleanWs()
         }
         success {
