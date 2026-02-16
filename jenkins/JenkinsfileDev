@@ -22,6 +22,7 @@ pipeline {
                 echo "Cloning repository from GitHub..."
                 checkout scm
                 git branch: 'main', url: "${REPO_URL}"
+                // env.BRANCH_NAME = 'main'
                 sh 'ls'
             }
         }
