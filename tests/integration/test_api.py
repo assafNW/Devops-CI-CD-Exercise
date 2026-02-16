@@ -73,7 +73,7 @@ class TestUserAPIIntegration:
                                data=json.dumps(incomplete_data),
                                content_type='application/json')
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
 
