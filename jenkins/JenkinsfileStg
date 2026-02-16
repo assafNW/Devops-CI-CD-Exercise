@@ -145,7 +145,8 @@ pipeline {
             
             steps {
                 script {
-                    sh '''   
+                    sh '''
+                        . ${VENV_DIR}/bin/activate 
                         locust -f tests/performance/locustfile.py \\
                             --headless \\
                             --users 10 \\
