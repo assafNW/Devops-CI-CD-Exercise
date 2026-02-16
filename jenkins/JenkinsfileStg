@@ -145,19 +145,13 @@ pipeline {
             
             steps {
                 script {
-                    sh '''
-                        . ${VENV_DIR}/bin/activate
-                        
-                        python main.py &
-                        APP_PID=$!
-                        sleep 5
-                        
+                    sh '''   
                         locust -f tests/performance/locustfile.py \\
                             --headless \\
                             --users 10 \\
                             --spawn-rate 2 \\
                             --run-time 30s \\
-                            --host http://localhost:5000 \\
+                            --host http://staging-app:5000 \\
                             --html reports/performance-report.html
                         
                         kill $APP_PID || true
@@ -191,7 +185,7 @@ pipeline {
                             git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/assafNW/Devops-CI-CD-Exercise.git
                             git fetch --tags
                         """
-                        def latestDevTag = sh(script: '''
+                        def latestDevTag = sh(script: """
                             LATEST_VERSION_DIGEST=$(curl -s 'https://registry.hub.docker.com/v2/repositories/${DOCKERHUB_USER}/${DOCKERHUB_DEV_REPO}/tags?name=latest' \
                                                                 | jq -r '.results[0].digest')
                             LATEST_VERSION_TAG=$(curl -s https://registry.hub.docker.com/v2/repositories/${DOCKERHUB_USER}/${DOCKERHUB_DEV_REPO}/tags \
@@ -202,7 +196,7 @@ pipeline {
                                                         | .name
                                                     ' | cut -d'v' -f2-)
                             echo $LATEST_VERSION_TAG
-                        ''', returnStdout: true).trim()
+                        """, returnStdout: true).trim()
 
                         echo "Current version: ${latestDevTag}"
                         def newVersion
