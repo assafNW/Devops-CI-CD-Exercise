@@ -19,6 +19,7 @@ pipeline {
     stages {
         stage('Checkout Source Code') {
             steps {
+                // checkout with scm
                 echo "Cloning repository from GitHub..."
                 git branch: 'main', url: "${REPO_URL}"
                 sh 'ls'
