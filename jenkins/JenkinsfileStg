@@ -49,7 +49,7 @@ pipeline {
                         docker network connect staging_network staging-app
 
                         sleep 5
-                        curl -f http://localhost:5000/health || exit 1
+                        curl -f http://staging-app:5000/health || exit 1
                     """
                 }
             }
