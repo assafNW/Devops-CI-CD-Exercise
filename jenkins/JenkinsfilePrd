@@ -150,7 +150,7 @@ pipeline {
                 sh 'echo "Pipeline failed!"'
                 sh 'echo "Sending email upon failure..."'
                 emailext (
-                    subject: "❌ Development Pipeline Failure: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                    subject: "❌ Pipeline Failure: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
                     body: """
                         <p>The pipeline failed!</p>
                         <ul>
@@ -172,7 +172,7 @@ pipeline {
                         project: [
                             key: 'CICDEX'
                         ],
-                        summary: "Development pipline failed! Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                        summary: "Pipline failed! Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
                         description: """
                         Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}, 
                         Branch: ${env.BRANCH_NAME}, 
