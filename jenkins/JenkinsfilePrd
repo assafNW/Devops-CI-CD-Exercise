@@ -58,7 +58,7 @@ pipeline {
                     sh """
                         docker network create production_network
                         docker network connect production_network jenkins
-                        docker network connect production_network staging-app
+                        docker network connect production_network production-app
 
                         sleep 5
                         curl -f http://production-app:5000/health || exit 1
@@ -114,7 +114,7 @@ pipeline {
             
             echo "Removing docker's production network..."
             sh """
-                docker network disconnect production_network staging-app || true
+                docker network disconnect production_network production-app || true
                 docker network disconnect production_network jenkins || true
                 docker network rm production_network
             """
