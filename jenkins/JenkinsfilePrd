@@ -1,0 +1,201 @@
+pipeline {
+    agent any
+    
+    environment {
+        PYTHON_VERSION = '3'
+        VENV_DIR = 'venv'
+        REPO_URL = 'https://github.com/assafNW/Devops-CI-CD-Exercise.git'
+        DOCKERHUB_DEV_REPO = 'devops-ci-cd-dev'
+        DOCKERHUB_RELEASE_REPO = 'devops-ci-cd'
+        DOCKERHUB_USER = 'assafnw'
+        EMAIL_AUTHOR = "assaf.naaman.work@gmail.com"
+        JIRA_JENKINS_USER = "712020:10dea211-8b58-46e4-aaca-6e942f7d405e"
+        JIRA_ASIGNEE_USER = "712020:8075411c-abf1-445b-b14e-3d659e5c8923"
+    }
+    
+    tools {
+        allure 'Allure'
+    }
+
+    stages {
+        stage('Checkout Source Code') {
+            steps {
+                echo "Cloning repository from GitHub..."
+                git branch: 'main', url: "${REPO_URL}"
+                sh 'ls'
+            }
+        }
+
+        stage('Setup Environment') {
+            steps {
+                script {
+                    sh 'echo "Setting up Python environment"'
+                    sh 'apt install -y python3 python3-venv python3-pip'
+                    sh 'python${PYTHON_VERSION} -m venv ${VENV_DIR}'
+                    sh '. ${VENV_DIR}/bin/activate && pip install --upgrade pip'
+                    sh '. ${VENV_DIR}/bin/activate && pip install -r requirements.txt'
+                }
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                script {
+                    sh """
+                        echo "Deploying to production environment"
+                        docker stop production-app || true
+                        docker rm production-app || true
+                        docker run -d --name production-app -p 5000:5000 ${DOCKERHUB_USER}/${DOCKERHUB_RELEASE_REPO}:latest
+                    """
+                }
+            }
+        }
+        
+        stage("Docker Network Setup"){
+            steps{
+                script{
+                    echo "Setting up docker network..."
+                    sh """
+                        docker network create production_network
+                        docker network connect production_network jenkins
+                        docker network connect production_network staging-app
+
+                        sleep 5
+                        curl -f http://production-app:5000/health || exit 1
+                    """
+                }
+            }
+        }
+
+        stage('Performance Tests') {
+            
+            steps {
+                script {
+                    sh '''
+                        . ${VENV_DIR}/bin/activate 
+                        locust -f tests/performance/locustfile.py \\
+                            --headless \\
+                            --users 10 \\
+                            --spawn-rate 2 \\
+                            --run-time 30s \\
+                            --host http://production-app:5000 \\
+                            --html reports/performance-report.html
+                        
+                        kill $APP_PID || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports',
+                        reportFiles: 'performance-report.html',
+                        reportName: 'Performance Test Report'
+                    ])
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            allure ([ 
+                results: [
+                    [path: 'allure-results/unit'],
+                    [path: 'allure-results/integration'],
+                    [path: 'allure-results/e2e']
+                ], 
+                includeProperties: true,
+                reportBuildPolicy: 'ALWAYS'
+            ])
+            
+            echo "Removing docker's production network..."
+            sh """
+                docker network disconnect production_network staging-app || true
+                docker network disconnect production_network jenkins || true
+                docker network rm production_network
+            """
+
+            echo "Stoping and removing production environment"
+            sh """
+                docker stop production-app
+                docker rm production-app
+            """ 
+            cleanWs()
+        }
+        success {
+            script {
+                sh 'echo "Pipeline completed successfully!"'
+                emailext (
+                    subject: "✅ Pipeline Success: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                    body: """
+                        <p>The pipeline completed successfully!</p>
+                        <ul>
+                            <li><strong>Build:</strong> ${env.BUILD_NUMBER}</li>
+                            <li><strong>Branch:</strong> ${env.BRANCH_NAME}</li>
+                            <li><strong>Duration:</strong> ${currentBuild.durationString}</li>
+                            <li><strong>Reports:</strong> Check the artifacts section</li>
+                        </ul>
+                        <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                    """,
+                    to: "${env.EMAIL_AUTHOR}"
+                )
+            }
+        }
+        failure {
+            script {
+                sh 'echo "Pipeline failed!"'
+                sh 'echo "Sending email upon failure..."'
+                emailext (
+                    subject: "❌ Development Pipeline Failure: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                    body: """
+                        <p>The pipeline failed!</p>
+                        <ul>
+                            <li><strong>Build:</strong> ${env.BUILD_NUMBER}</li>
+                            <li><strong>Branch:</strong> ${env.BRANCH_NAME}</li>
+                            <li><strong>Duration:</strong> ${currentBuild.durationString}</li>
+                            <li><strong>Failed Stage:</strong> ${currentBuild.currentResult}</li>
+                        </ul>
+                        <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                    """,
+                    to: "${env.EMAIL_AUTHOR}"
+                )
+            }
+
+            echo "Opening a bug ticket on JIRA..."
+            script{
+                def bugIssue = [
+                    fields: [
+                        project: [
+                            key: 'CICDEX'
+                        ],
+                        summary: "Development pipline failed! Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                        description: """
+                        Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}, 
+                        Branch: ${env.BRANCH_NAME}, 
+                        Duration: ${currentBuild.durationString}, 
+                        Failed Stage: ${currentBuild.currentResult}, 
+                        View Build Details Here: ${env.BUILD_URL}
+                        """,
+                        issuetype: [
+                            name: 'Bug'
+                        ],
+                        reporter: [
+                            id: "${env.JIRA_JENKINS_USER}"
+                        ],
+                        // This sets who the bug is assigned to
+                        assignee: [
+                            id: "${env.JIRA_ASIGNEE_USER}"
+                        ]
+                    ]
+                ]
+                // Creates the issue and return the ID
+                def response = jiraNewIssue issue: bugIssue, site: 'assaf-devops'
+                echo "Bug ticket created on JIRA: ${response.data.key}"
+            }
+        }
+    }
+}
