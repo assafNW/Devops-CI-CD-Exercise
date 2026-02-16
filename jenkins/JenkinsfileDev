@@ -219,7 +219,7 @@ pipeline {
                         
                         sh """
                             git tag -a ${env.newVersion}-dev -m "jenkins-local: Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"
-                            git push ${env.newVersion}-dev
+                            git push origin ${env.newVersion}-dev
                         """
                     }
                 }
