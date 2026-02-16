@@ -34,9 +34,6 @@ pipeline {
                         docker stop staging-app || true
                         docker rm staging-app || true
                         docker run -d --name staging-app -p 5000:5000 ${DOCKERHUB_USER}/${DOCKERHUB_DEV_REPO}:latest
-                        
-                        sleep 5
-                        curl -f http://localhost:5000/health || exit 1
                     """
                 }
             }
@@ -50,6 +47,9 @@ pipeline {
                         docker network create staging_network
                         docker network connect staging_network jenkins
                         docker network connect staging_network staging-app
+
+                        sleep 5
+                        curl -f http://localhost:5000/health || exit 1
                     """
                 }
             }
@@ -255,8 +255,8 @@ pipeline {
 
             echo "Stoping and removing staging environment"
             sh """
-                docker stop staging-app || true
-                docker rm staging-app || true
+                docker stop staging-app
+                docker rm staging-app
             """ 
             cleanWs()
         }
