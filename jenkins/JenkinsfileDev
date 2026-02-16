@@ -19,8 +19,8 @@ pipeline {
     stages {
         stage('Checkout Source Code') {
             steps {
-                // checkout with scm
                 echo "Cloning repository from GitHub..."
+                checkout scm
                 git branch: 'main', url: "${REPO_URL}"
                 sh 'ls'
             }
@@ -131,16 +131,15 @@ pipeline {
             }
         }
         
-        stage('Build & Push Docker Image and GitHub Tag') {
+        stage('Calculating App Version') {
             steps {
                 script {
                     withCredentials([
-                        usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS'),
                         usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')
                     ]) {
                         sh """
-                            git config --global user.name "jenkins-local"
-                            git config --global user.email "jenkins-local@gmail.com"
+                            git config user.name "jenkins-local"
+                            git config user.email "jenkins-local@gmail.com"
                             git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/assafNW/Devops-CI-CD-Exercise.git
                             git fetch --tags
                         """
@@ -150,9 +149,9 @@ pipeline {
                         ).trim()
 
                         echo "Current version: ${latestTag}"
-                        def newVersion
+                        env.newVersion = ''
                         if (latestTag == '') {
-                            newVersion = 'v1.0.0'
+                            env.newVersion = 'v1.0.0'
                         }
                         else {
                             def parts = latestTag.replace('v','').tokenize('.')
@@ -161,44 +160,140 @@ pipeline {
                             def patch = parts[2].toInteger()
                             if (patch == 9){
                                 patch = 0
-                                minor = 1
+                                minor += 1
                             }
                             else {
                                 patch += 1
                             }
-                            newVersion = "v${major}.${minor}.${patch}"
+                            env.newVersion = "v${major}.${minor}.${patch}"
                         }
                         
-                        echo "New version: ${newVersion}"
+                        echo "New version: ${env.newVersion}"
 
                         echo "---------------------------------------"
-                        echo "   New Release Version: ${newVersion}"
+                        echo "   New Release Version: ${env.newVersion}"
                         echo "---------------------------------------"
+                    }
+                }
+            }
+        }
 
+        stage('Build & Push Docker Image') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                    ]) {
+                        
                         sh """
                             echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                            echo "Building ${newVersion}..."
+                            echo "Building ${env.newVersion}..."
 
-                            docker build -f docker/dockerfile -t ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion} .
-                            docker tag ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion} ${DOCKER_USER}/${DOCKERHUB_REPO}:latest
+                            docker build -f docker/dockerfile -t ${DOCKER_USER}/${DOCKERHUB_REPO}:${env.newVersion} .
+                            docker tag ${DOCKER_USER}/${DOCKERHUB_REPO}:${env.newVersion} ${DOCKER_USER}/${DOCKERHUB_REPO}:latest
                             
                             echo "Pushing Docker images..."
-                            docker push ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion}
+                            docker push ${DOCKER_USER}/${DOCKERHUB_REPO}:${env.newVersion}
                             docker push ${DOCKER_USER}/${DOCKERHUB_REPO}:latest
                             
                             docker logout
-                        """
-
-                        echo "Pushing new tag to GitHub..."
-                        
-                        sh """
-                            git tag -a ${newVersion}-dev -m "jenkins-local: Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"
-                            git push origin ${newVersion}-dev
                         """
                     }
                 }
             }
         }
+
+        stage('Push GitHub Tag') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')
+                    ]) {
+                        sh """
+                            git config user.name "jenkins-local"
+                            git config user.email "jenkins-local@gmail.com"
+                            git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/assafNW/Devops-CI-CD-Exercise.git
+                        """
+                        
+                        echo "Pushing new tag to GitHub..."
+                        
+                        sh """
+                            git tag -a ${env.newVersion}-dev -m "jenkins-local: Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"
+                            git push ${env.newVersion}-dev
+                        """
+                    }
+                }
+            }
+        }
+
+        // stage('Build & Push Docker Image and GitHub Tag') {
+        //     steps {
+        //         script {
+        //             withCredentials([
+        //                 usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS'),
+        //                 usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')
+        //             ]) {
+        //                 sh """
+        //                     git config --global user.name "jenkins-local"
+        //                     git config --global user.email "jenkins-local@gmail.com"
+        //                     git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/assafNW/Devops-CI-CD-Exercise.git
+        //                     git fetch --tags
+        //                 """
+        //                 def latestTag = sh(
+        //                     script: "git tag --sort=-v:refname | grep -Eo 'v[0-9]+\\.[0-9]+\\.[0-9]+' | head -n1",
+        //                     returnStdout: true
+        //                 ).trim()
+
+        //                 echo "Current version: ${latestTag}"
+        //                 def newVersion
+        //                 if (latestTag == '') {
+        //                     newVersion = 'v1.0.0'
+        //                 }
+        //                 else {
+        //                     def parts = latestTag.replace('v','').tokenize('.')
+        //                     def major = parts[0].toInteger()
+        //                     def minor = parts[1].toInteger()
+        //                     def patch = parts[2].toInteger()
+        //                     if (patch == 9){
+        //                         patch = 0
+        //                         minor = 1
+        //                     }
+        //                     else {
+        //                         patch += 1
+        //                     }
+        //                     newVersion = "v${major}.${minor}.${patch}"
+        //                 }
+                        
+        //                 echo "New version: ${newVersion}"
+
+        //                 echo "---------------------------------------"
+        //                 echo "   New Release Version: ${newVersion}"
+        //                 echo "---------------------------------------"
+
+        //                 sh """
+        //                     echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+        //                     echo "Building ${newVersion}..."
+
+        //                     docker build -f docker/dockerfile -t ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion} .
+        //                     docker tag ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion} ${DOCKER_USER}/${DOCKERHUB_REPO}:latest
+                            
+        //                     echo "Pushing Docker images..."
+        //                     docker push ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion}
+        //                     docker push ${DOCKER_USER}/${DOCKERHUB_REPO}:latest
+                            
+        //                     docker logout
+        //                 """
+
+        //                 echo "Pushing new tag to GitHub..."
+                        
+        //                 sh """
+        //                     git tag -a ${newVersion}-dev -m "jenkins-local: Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"
+        //                     git push origin ${newVersion}-dev
+        //                 """
+        //             }
+        //         }
+        //     }
+        // }
     }
     
     post {
