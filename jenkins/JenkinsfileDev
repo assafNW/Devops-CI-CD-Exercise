@@ -4,7 +4,9 @@ pipeline {
     environment {
         PYTHON_VERSION = '3'
         VENV_DIR = 'venv'
+        PID_FILE = 'myapp.pid'
         REPO_URL = 'https://github.com/assafNW/Devops-CI-CD-Exercise.git'
+        DOCKERHUB_REPO = 'devops-ci-cd-dev'
         EMAIL_AUTHOR = "assaf.naaman.work@gmail.com"
         JIRA_JENKINS_USER = "712020:10dea211-8b58-46e4-aaca-6e942f7d405e"
         JIRA_ASIGNEE_USER = "712020:8075411c-abf1-445b-b14e-3d659e5c8923"
@@ -31,6 +33,11 @@ pipeline {
                     sh 'python${PYTHON_VERSION} -m venv ${VENV_DIR}'
                     sh '. ${VENV_DIR}/bin/activate && pip install --upgrade pip'
                     sh '. ${VENV_DIR}/bin/activate && pip install -r requirements.txt'
+                    echo "Running app in the background..."
+                    sh '''
+                    . ${VENV_DIR}/bin/activate && nohup python3 main.py > output.log 2>&1 &
+                    echo $! > ${PID_FILE}
+                    '''
                 }
             }
         }
@@ -123,44 +130,7 @@ pipeline {
             }
         }
         
-        // stage('Performance Tests') {
-            
-        //     steps {
-        //         script {
-        //             sh '''
-        //                 . ${VENV_DIR}/bin/activate
-                        
-        //                 python main.py &
-        //                 APP_PID=$!
-        //                 sleep 5
-                        
-        //                 locust -f tests/performance/locustfile.py \\
-        //                     --headless \\
-        //                     --users 10 \\
-        //                     --spawn-rate 2 \\
-        //                     --run-time 30s \\
-        //                     --host http://localhost:5000 \\
-        //                     --html reports/performance-report.html
-                        
-        //                 kill $APP_PID || true
-        //             '''
-        //         }
-        //     }
-        //     post {
-        //         always {
-        //             publishHTML([
-        //                 allowMissing: false,
-        //                 alwaysLinkToLastBuild: true,
-        //                 keepAll: true,
-        //                 reportDir: 'reports',
-        //                 reportFiles: 'performance-report.html',
-        //                 reportName: 'Performance Test Report'
-        //             ])
-        //         }
-        //     }
-        // }
-        
-        stage('Build Docker Image') {
+        stage('Build & Push Docker Image and GitHub Tag') {
             steps {
                 script {
                     withCredentials([
@@ -208,12 +178,12 @@ pipeline {
                             echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
                             echo "Building ${newVersion}..."
 
-                            docker build -f docker/dockerfile -t assafnw/devops-ci-cd-dev:${newVersion} .
-                            docker tag assafnw/devops-ci-cd-dev:${newVersion} assafnw/devops-ci-cd-dev:latest
+                            docker build -f docker/dockerfile -t ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion} .
+                            docker tag ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion} ${DOCKER_USER}/${DOCKERHUB_REPO}:latest
                             
                             echo "Pushing Docker images..."
-                            docker push assafnw/devops-ci-cd-dev:${newVersion}
-                            docker push assafnw/devops-ci-cd-dev:latest
+                            docker push ${DOCKER_USER}/${DOCKERHUB_REPO}:${newVersion}
+                            docker push ${DOCKER_USER}/${DOCKERHUB_REPO}:latest
                             
                             docker logout
                         """
@@ -221,29 +191,10 @@ pipeline {
                         echo "Pushing new tag to GitHub..."
                         
                         sh """
-                            git tag -a ${newVersion} -m "jenkins-local: Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"
-                            git push origin ${newVersion}
+                            git tag -a ${newVersion}-dev -m "jenkins-local: Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"
+                            git push origin ${newVersion}-dev
                         """
                     }
-                }
-            }
-        }
-        
-        stage('Deploy to Staging') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                script {
-                    sh '''
-                        echo "Deploying to staging environment"
-                        docker stop staging-app || true
-                        docker rm staging-app || true
-                        docker run -d --name staging-app -p 5001:5000 devops-testing-app:${BUILD_NUMBER}
-                        
-                        sleep 5
-                        curl -f http://localhost:5001/health || exit 1
-                    '''
                 }
             }
         }
@@ -260,6 +211,18 @@ pipeline {
                 includeProperties: true,
                 reportBuildPolicy: 'ALWAYS'
             ])
+
+            echo "Killing app process..."
+            sh '''
+                if [ -f ${PID_FILE} ]; then
+                    PID=$(cat ${PID_FILE})
+                    if ps -p $PID > /dev/null; then
+                        kill $PID
+                        echo "Killed process $PID"
+                    fi
+                    rm -f ${PID_FILE}
+                fi
+            '''
             cleanWs()
         }
         success {
@@ -286,7 +249,7 @@ pipeline {
                 sh 'echo "Pipeline failed!"'
                 sh 'echo "Sending email upon failure..."'
                 emailext (
-                    subject: "❌ Pipeline Failure: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                    subject: "❌ Development Pipeline Failure: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
                     body: """
                         <p>The pipeline failed!</p>
                         <ul>

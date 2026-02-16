@@ -1,0 +1,335 @@
+pipeline {
+    agent any
+    
+    environment {
+        PYTHON_VERSION = '3'
+        VENV_DIR = 'venv'
+        REPO_URL = 'https://github.com/assafNW/Devops-CI-CD-Exercise.git'
+        DOCKERHUB_DEV_REPO = 'devops-ci-cd-dev'
+        DOCKERHUB_RELEASE_REPO = 'devops-ci-cd'
+        DOCKERHUB_USER = 'assafnw'
+        EMAIL_AUTHOR = "assaf.naaman.work@gmail.com"
+        JIRA_JENKINS_USER = "712020:10dea211-8b58-46e4-aaca-6e942f7d405e"
+        JIRA_ASIGNEE_USER = "712020:8075411c-abf1-445b-b14e-3d659e5c8923"
+    }
+    
+    tools {
+        allure 'Allure'
+    }
+
+    stages {
+        stage('Checkout Source Code') {
+            steps {
+                echo "Cloning repository from GitHub..."
+                git branch: 'main', url: "${REPO_URL}"
+                sh 'ls'
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                script {
+                    sh """
+                        echo "Deploying to staging environment"
+                        docker stop staging-app || true
+                        docker rm staging-app || true
+                        docker run -d --name staging-app -p 5000:5000 ${DOCKERHUB_USER}/${DOCKERHUB_DEV_REPO}:latest
+                        
+                        sleep 5
+                        curl -f http://localhost:5000/health || exit 1
+                    """
+                }
+            }
+        }
+        
+        stage("Docker Network Setup"){
+            steps{
+                script{
+                    echo "Setting up docker network..."
+                    sh """
+                        docker network create staging_network
+                        docker network connect staging_network jenkins
+                        docker network connect staging_network staging-app
+                    """
+                }
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                script {
+                    sh 'mkdir -p reports'
+                    sh '. ${VENV_DIR}/bin/activate && pytest tests/unit/ -v --alluredir=allure-results/unit --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/unit-tests.xml'
+                }
+            }
+            post {
+                always {
+                    junit 'reports/unit-tests.xml'
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'htmlcov',
+                        reportFiles: 'unit-tests.html',
+                        reportName: 'Unit Test Coverage Report'
+                    ])
+                    archiveArtifacts artifacts: 'htmlcov/**/*', allowEmptyArchive: false
+                }
+            }
+        }
+        
+        stage('Integration Tests') {
+            steps {
+                script {
+                    sh '. ${VENV_DIR}/bin/activate && pytest tests/integration/ -v --alluredir=allure-results/integration --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/integration-tests.xml'
+                }
+            }
+            post {
+                always {
+                    junit 'reports/integration-tests.xml'
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'htmlcov',
+                        reportFiles: 'integration-tests.html',
+                        reportName: 'Integration Tests Coverage Report'
+                    ])
+                    archiveArtifacts artifacts: 'htmlcov/**/*', allowEmptyArchive: false
+                }
+            }
+        }
+        
+        stage('End-to-End Tests') {
+            steps {
+                script {
+                    sh '''
+                        . ${VENV_DIR}/bin/activate
+                        export DISPLAY=:99
+                        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+                        sleep 3
+                        pytest tests/e2e/ -v --alluredir=allure-results/e2e --cov=app --cov-report=xml --cov-report=html --junit-xml=reports/e2e-tests.xml
+                        killall Xvfb || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    junit 'reports/e2e-tests.xml'
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'htmlcov',
+                        reportFiles: 'e2e-tests.html',
+                        reportName: 'E2E Tests Coverage Report'
+                    ])
+                    archiveArtifacts artifacts: 'htmlcov/**/*', allowEmptyArchive: false
+                }
+            }
+        }
+        
+        stage('Performance Tests') {
+            
+            steps {
+                script {
+                    sh '''
+                        . ${VENV_DIR}/bin/activate
+                        
+                        python main.py &
+                        APP_PID=$!
+                        sleep 5
+                        
+                        locust -f tests/performance/locustfile.py \\
+                            --headless \\
+                            --users 10 \\
+                            --spawn-rate 2 \\
+                            --run-time 30s \\
+                            --host http://localhost:5000 \\
+                            --html reports/performance-report.html
+                        
+                        kill $APP_PID || true
+                    '''
+                }
+            }
+            post {
+                always {
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports',
+                        reportFiles: 'performance-report.html',
+                        reportName: 'Performance Test Report'
+                    ])
+                }
+            }
+        }
+        
+        stage('Build & Push Docker Image and GitHub Tag') {
+            steps {
+                script {
+                    withCredentials([
+                        usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS'),
+                        usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')
+                    ]) {
+                        sh """
+                            git config --global user.name "jenkins-local"
+                            git config --global user.email "jenkins-local@gmail.com"
+                            git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/assafNW/Devops-CI-CD-Exercise.git
+                            git fetch --tags
+                        """
+                        def latestDevTag = sh """
+                            LATEST_VERSION_DIGEST=$(curl -s 'https://registry.hub.docker.com/v2/repositories/${DOCKERHUB_USER}/${DOCKERHUB_DEV_REPO}/tags?name=latest' \
+                                                                | jq -r '.results[0].digest')
+                            LATEST_VERSION_TAG=$(curl -s https://registry.hub.docker.com/v2/repositories/${DOCKERHUB_USER}/${DOCKERHUB_DEV_REPO}/tags \
+                                                        | jq -r --arg d "$LATEST_VERSION_DIGEST" '
+                                                        .results[]
+                                                        | select(.digest == $d)
+                                                        | select(.name | startswith("v"))
+                                                        | .name
+                                                    ' | cut -d'v' -f2-)
+                            echo $LATEST_VERSION_TAG
+                        """
+
+                        echo "Current version: ${latestDevTag}"
+                        def newVersion
+                        if (latestDevTag == '') {
+                            newVersion = 'v1.0.0'
+                        }
+                        else {
+                            newVersion = latestDevTag
+                        }
+                        
+                        echo "New version: ${newVersion}"
+
+                        echo "---------------------------------------"
+                        echo "   New Release Version: ${newVersion}"
+                        echo "---------------------------------------"
+
+                        sh """
+                            echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                            echo "Pushing image version ${newVersion} to release repo..."
+
+                            docker pull ${DOCKER_USER}/${DOCKERHUB_DEV_REPO}:latest
+                            docker tag ${DOCKER_USER}/${DOCKERHUB_DEV_REPO}:latest ${DOCKER_USER}/${DOCKERHUB_RELEASE_REPO}:${newVersion}
+                            docker tag ${DOCKER_USER}/${DOCKERHUB_RELEASE_REPO}:${newVersion} ${DOCKER_USER}/${DOCKERHUB_RELEASE_REPO}:latest
+
+                            echo "Pushing Docker images..."
+                            docker push ${DOCKER_USER}/${DOCKERHUB_RELEASE_REPO}:${newVersion}
+                            docker push ${DOCKER_USER}/${DOCKERHUB_RELEASE_REPO}:latest
+                            
+                            docker logout
+                        """
+
+                        echo "Pushing new tag to GitHub..."
+                        
+                        sh """
+                            git tag -a ${newVersion} -m "jenkins-local: Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}"
+                            git push origin ${newVersion}
+                        """
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            allure ([ 
+                results: [
+                    [path: 'allure-results/unit'],
+                    [path: 'allure-results/integration'],
+                    [path: 'allure-results/e2e']
+                ], 
+                includeProperties: true,
+                reportBuildPolicy: 'ALWAYS'
+            ])
+            
+            echo "Removing docker's staging network..."
+            sh """
+                docker network disconnect staging_network staging-app
+                docker network disconnect staging_network jenkins
+                docker network rm staging_network
+            """
+
+            echo "Stoping and removing staging environment"
+            sh """
+                docker stop staging-app || true
+                docker rm staging-app || true
+            """ 
+            cleanWs()
+        }
+        success {
+            script {
+                sh 'echo "Pipeline completed successfully!"'
+                emailext (
+                    subject: "✅ Pipeline Success: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                    body: """
+                        <p>The pipeline completed successfully!</p>
+                        <ul>
+                            <li><strong>Build:</strong> ${env.BUILD_NUMBER}</li>
+                            <li><strong>Branch:</strong> ${env.BRANCH_NAME}</li>
+                            <li><strong>Duration:</strong> ${currentBuild.durationString}</li>
+                            <li><strong>Reports:</strong> Check the artifacts section</li>
+                        </ul>
+                        <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                    """,
+                    to: "${env.EMAIL_AUTHOR}"
+                )
+            }
+        }
+        failure {
+            script {
+                sh 'echo "Pipeline failed!"'
+                sh 'echo "Sending email upon failure..."'
+                emailext (
+                    subject: "❌ Development Pipeline Failure: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                    body: """
+                        <p>The pipeline failed!</p>
+                        <ul>
+                            <li><strong>Build:</strong> ${env.BUILD_NUMBER}</li>
+                            <li><strong>Branch:</strong> ${env.BRANCH_NAME}</li>
+                            <li><strong>Duration:</strong> ${currentBuild.durationString}</li>
+                            <li><strong>Failed Stage:</strong> ${currentBuild.currentResult}</li>
+                        </ul>
+                        <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                    """,
+                    to: "${env.EMAIL_AUTHOR}"
+                )
+            }
+
+            echo "Opening a bug ticket on JIRA..."
+            script{
+                def bugIssue = [
+                    fields: [
+                        project: [
+                            key: 'CICDEX'
+                        ],
+                        summary: "Development pipline failed! Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}",
+                        description: """
+                        Build: ${env.JOB_NAME} - ${env.BUILD_NUMBER}, 
+                        Branch: ${env.BRANCH_NAME}, 
+                        Duration: ${currentBuild.durationString}, 
+                        Failed Stage: ${currentBuild.currentResult}, 
+                        View Build Details Here: ${env.BUILD_URL}
+                        """,
+                        issuetype: [
+                            name: 'Bug'
+                        ],
+                        reporter: [
+                            id: "${env.JIRA_JENKINS_USER}"
+                        ],
+                        // This sets who the bug is assigned to
+                        assignee: [
+                            id: "${env.JIRA_ASIGNEE_USER}"
+                        ]
+                    ]
+                ]
+                // Creates the issue and return the ID
+                def response = jiraNewIssue issue: bugIssue, site: 'assaf-devops'
+                echo "Bug ticket created on JIRA: ${response.data.key}"
+            }
+        }
+    }
+}
