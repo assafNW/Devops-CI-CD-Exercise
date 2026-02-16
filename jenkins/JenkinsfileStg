@@ -187,9 +187,9 @@ pipeline {
                             git fetch --tags
                         """
                         def latestDevTag = sh(script: '''
-                            LATEST_VERSION_DIGEST=$(curl -s 'https://registry.hub.docker.com/v2/repositories/$DOCKERHUB_USER/$DOCKERHUB_DEV_REPO/tags?name=latest' \
+                            LATEST_VERSION_DIGEST=$(curl -s 'https://registry.hub.docker.com/v2/repositories/assafnw/devops-ci-cd-dev/tags?name=latest' \
                                                                 | jq -r '.results[0].digest')
-                            LATEST_VERSION_TAG=$(curl -s https://registry.hub.docker.com/v2/repositories/$DOCKERHUB_USER/$DOCKERHUB_DEV_REPO/tags \
+                            LATEST_VERSION_TAG=$(curl -s https://registry.hub.docker.com/v2/repositories/assafnw/devops-ci-cd-dev/tags \
                                                         | jq -r --arg d "$LATEST_VERSION_DIGEST" '
                                                         .results[]
                                                         | select(.digest == $d)
