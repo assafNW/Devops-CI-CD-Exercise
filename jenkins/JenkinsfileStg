@@ -255,8 +255,8 @@ pipeline {
             
             echo "Removing docker's staging network..."
             sh """
-                docker network disconnect staging_network staging-app
-                docker network disconnect staging_network jenkins
+                docker network disconnect staging_network staging-app || true
+                docker network disconnect staging_network jenkins || true
                 docker network rm staging_network
             """
 
